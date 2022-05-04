@@ -12,4 +12,5 @@ This repo contains mainly personal notes, in the form of code comment.
 - Chapter 6: Parsing Expressions
 - Chapter 7: Evaluating Expressions
 - Chapter 8: Statements and state
+- Chapter 9: Control Flow
 
