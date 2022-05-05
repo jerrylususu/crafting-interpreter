@@ -23,8 +23,16 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     // String: var name, Boolean: var is ready (defined), see visitVarStmt
     private final Stack<Map<String, Boolean>> scopes = new Stack<>();
 
+    // help to check whether the usage of "return" is valid
+    private FunctionType currentFunction = FunctionType.NONE;
+
     Resolver(Interpreter interpreter) {
         this.interpreter = interpreter;
+    }
+
+    private enum FunctionType {
+        NONE,
+        FUNCTION
     }
 
     void resolve(List<Stmt> statements) {
@@ -33,7 +41,12 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         }
     }
 
-    private void resolveFunction(Stmt.Function function) {
+    private void resolveFunction(Stmt.Function function, FunctionType type) {
+        // Lox has local functions, so you can nest function declarations arbitrarily deeply
+        // piggyback on the JVM and store previous value on stack
+        FunctionType enclosingFunction = currentFunction;
+        currentFunction = type;
+
         beginScope();
         // bind var for each param
         for (Token param : function.params) {
@@ -43,6 +56,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         }
         resolve(function.body);
         endScope();
+        currentFunction = enclosingFunction;
     }
 
     private void beginScope() {
@@ -57,8 +71,12 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         // only take care of local scopes, ignore global scope
         if (scopes.isEmpty()) return;
 
-        // question: why not scopes.peek().put(), as in define?
         Map<String, Boolean> scope = scopes.peek();
+        // detect multiple var decl in local scope
+        // (mistake in local scope, but accepted in global scope)
+        if (scope.containsKey(name.lexeme)) {
+            Lox.error(name, "Already a variable with this name in this scope.");
+        }
         // false: var is not ready yet
         scope.put(name.lexeme, false);
     }
@@ -105,7 +123,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         declare(stmt.name);
         define(stmt.name);
 
-        resolveFunction(stmt);
+        resolveFunction(stmt, FunctionType.FUNCTION);
         return null;
     }
 
@@ -127,6 +145,10 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitReturnStmt(Stmt.Return stmt) {
+        if (currentFunction == FunctionType.NONE) {
+            Lox.error(stmt.keyword, "Can't return from top-level code.");
+        }
+
         if (stmt.value != null) {
             resolve(stmt.value);
         }
@@ -233,3 +255,5 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
 
 }
+
+
