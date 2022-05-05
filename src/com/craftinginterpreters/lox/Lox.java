@@ -59,6 +59,13 @@ public class Lox {
     if (hadError) return;
 
 //    System.out.println(new AstPrinter().print(expression));
+
+    // static analysis: resolve variables with scope info
+    Resolver resolver = new Resolver(interpreter);
+    // resolver has a reference to the interpreter and pokes the
+    // resolution data directly into it as it walks over variable
+    resolver.resolve(statements);
+
     interpreter.interpret(statements); // interpreting
   }
 

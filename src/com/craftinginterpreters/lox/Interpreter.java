@@ -1,7 +1,9 @@
 package com.craftinginterpreters.lox;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
@@ -11,6 +13,10 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     // tracks current env, which changes as we enter and exit local scopes
     // initialized as global
     private Environment environment = globals;
+
+    // variable resolution info
+    // each expression node is its own Java object, no need for nested tree map
+    private final Map<Expr, Integer> locals = new HashMap<>();
 
 
     Interpreter() {
@@ -86,7 +92,18 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     @Override
     public Object visitVariableExpr(Expr.Variable expr) {
-        return environment.get(expr.name);
+        return lookUpVariable(expr.name, expr);
+    }
+
+    private Object lookUpVariable(Token name, Expr expr) {
+        Integer distance = locals.get(expr);
+        if (distance != null) {
+            return environment.getAt(distance, name.lexeme);
+        } else {
+            // global vars are left unresolved, no record in the var info map
+            // throws runtime error if var is not defined
+            return globals.get(name);
+        }
     }
 
     private void checkNumberOperand(Token operator, Object operand) {
@@ -150,6 +167,11 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     private void execute(Stmt stmt) {
         stmt.accept(this);
+    }
+
+    void resolve(Expr expr, int depth) {
+        // depth: number of environments between the current one and the enclosing one
+        locals.put(expr, depth);
     }
 
     void executeBlock(List<Stmt> statements, Environment environment) {
@@ -245,7 +267,14 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     @Override
     public Object visitAssignExpr(Expr.Assign expr) {
         Object value = evaluate(expr.value);
-        environment.assign(expr.name, value);
+
+        Integer distance = locals.get(expr);
+        if (distance != null) {
+            environment.assignAt(distance, expr.name, value);
+        } else {
+            globals.assign(expr.name, value);
+        }
+
         // assign is an expression, returns eval result of right-hand
         return value;
     }
