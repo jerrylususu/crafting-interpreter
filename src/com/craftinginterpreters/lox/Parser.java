@@ -32,6 +32,7 @@ class Parser {
 
   private Stmt declaration() {
     try {
+      if (match(FUN)) return function("function");
       if (match(VAR)) return varDeclaration();
 
       return statement();
@@ -163,6 +164,32 @@ class Parser {
     return new Stmt.Expression(expr);
   }
 
+  private Stmt.Function function(String kind) {
+    // kind can be "function" or "method"
+    // method is just function in a class
+    Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
+
+    // params
+    consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
+    List<Token> parameters = new ArrayList<>();
+    if (!check(RIGHT_PAREN)) {
+      do {
+        if (parameters.size() >= 255) {
+          error(peek(), "Can't have more than 255 parameters");
+        }
+
+        parameters.add(consume(IDENTIFIER, "Expect parameter name."));
+      } while (match(COMMA));
+    }
+    consume(RIGHT_PAREN, "Expect ')' after parameters.");
+
+    // body
+    // note: block() assumes left brace has been consumed.
+    consume(LEFT_BRACE, "Expect '(' before " + kind + " body.");
+    List<Stmt> body = block();
+    return new Stmt.Function(name, parameters, body);
+  }
+
   private List<Stmt> block() {
     List<Stmt> statements = new ArrayList<>();
 
@@ -170,6 +197,7 @@ class Parser {
       statements.add(declaration());
     }
 
+    // assumes left brace has been consumed
     consume(RIGHT_BRACE, "Expect '}' after block.");
     // return raw list of statements here
     // so this block logic can be reused for scope, function and more
@@ -281,7 +309,43 @@ class Parser {
       return new Expr.Unary(operator, right);
     }
 
-    return primary();
+    return call();
+  }
+
+  private Expr call() {
+    Expr expr = primary();
+
+    // func()()()...
+    while(true){
+      if(match(LEFT_PAREN)) {
+        expr = finishCall(expr);
+      } else {
+        break;
+      }
+    }
+
+    return expr;
+  }
+
+  private Expr finishCall(Expr callee) {
+    List<Expr> arguments = new ArrayList<>();
+    // arguments are optional, but there might be many
+    if (!check(RIGHT_PAREN)) {
+      do {
+        if (arguments.size() >= 255) {
+          // deliberate limit to make clox's bytecode easier
+          // only report error, but no throwing
+          // the parser is still at a valid state, not confused, and can keep carry on
+          error(peek(), "Can't have more than 255 arguments.");
+        }
+        arguments.add(expression());
+      } while (match(COMMA));
+    }
+
+    // save paren for location in runtime error reporting
+    Token paren = consume(RIGHT_PAREN, "Expect ')' after arguments.");
+
+    return new Expr.Call(callee, paren, arguments);
   }
 
   private Expr primary() {
