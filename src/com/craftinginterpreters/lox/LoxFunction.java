@@ -6,8 +6,10 @@ import java.util.List;
 // basically a wrapper with runtime info around Stmt.Function
 class LoxFunction implements LoxCallable {
     private final Stmt.Function declaration;
+    private final Environment closure;
 
-    LoxFunction(Stmt.Function declaration) {
+    LoxFunction(Stmt.Function declaration, Environment closure) {
+        this.closure = closure;
         this.declaration = declaration;
     }
 
@@ -15,7 +17,8 @@ class LoxFunction implements LoxCallable {
     public Object call(Interpreter interpreter, List<Object> arguments) {
         // create a new environment at each call, not at the function declaration
         // (function-local env)
-        Environment environment = new Environment(interpreter.globals);
+        // use closure as parent, so surrounding vars are captured
+        Environment environment = new Environment(closure);
         // bind values to parameters
         for (int i = 0; i < declaration.params.size(); i++) {
             environment.define(declaration.params.get(i).lexeme, arguments.get(i));
