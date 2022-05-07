@@ -20,9 +20,18 @@ class LoxInstance {
     }
 
     Object get(Token name) {
+        // When accessing a property, you might get a field, a bit of state stored on the instance,
+        // or you could hit a method defined on the instance’s class.
+
+        // note: subtle semantic choice
+        // Looking for a field first implies that fields shadow methods
         if (fields.containsKey(name.lexeme)) {
             return fields.get(name.lexeme);
         }
+
+        // if no matching (instance) field, try to find (class) methods
+        LoxFunction method = klass.findMethod(name.lexeme);
+        if (method != null) return method;
 
         throw new RuntimeError(name, "Undefined Property '" + name.lexeme + "'.");
     }
