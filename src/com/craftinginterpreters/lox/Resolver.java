@@ -41,7 +41,8 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     private enum ClassType {
         NONE,
-        CLASS
+        CLASS,
+        SUBCLASS
     }
 
     // helps to check if "this" is used outside a method
@@ -138,7 +139,15 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         // so it’s possible the superclass name refers to a local variable,
         // therefore has the need to resolve
         if (stmt.superclass != null) {
+            currentClass = ClassType.SUBCLASS;
             resolve(stmt.superclass);
+        }
+
+        // bind "super" when the class is defined
+        // all instance of the class has the one and same "super"
+        if (stmt.superclass != null) {
+            beginScope();
+            scopes.peek().put("super", true);
         }
 
         beginScope();
@@ -156,6 +165,8 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         }
 
         endScope();
+
+        if (stmt.superclass != null) endScope();
 
         currentClass = enclosingClass;
         return null;
@@ -295,6 +306,19 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         // no need to solve property (name) here.
         resolve(expr.value);
         resolve(expr.object);
+        return null;
+    }
+
+    @Override
+    public Void visitSuperExpr(Expr.Super expr) {
+        // check if the use of "super" is valid
+        if (currentClass == ClassType.NONE) {
+            Lox.error(expr.keyword, "Can't use 'super' outside a class.");
+        } else if (currentClass != ClassType.SUBCLASS) {
+            Lox.error(expr.keyword, "Can't use 'super' in a class with no superclass.");
+        }
+
+        resolveLocal(expr, expr.keyword);
         return null;
     }
 

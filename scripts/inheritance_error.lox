@@ -2,7 +2,15 @@
 // 13.1
 class Oops < Oops {}
 
+// 13.3.3
+class Eclair {
+  cook() {
+    super.cook();
+    print "Pipe full of crème pâtissière.";
+  }
+}
 
+super.notEvenInAClass();
 
 // runtime
 
