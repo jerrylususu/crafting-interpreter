@@ -18,8 +18,14 @@ class LoxClass implements LoxCallable{
     }
 
     LoxFunction findMethod(String name) {
+        // local method has higher priority (override)
         if (methods.containsKey(name)) {
             return methods.get(name);
+        }
+
+        // only find up if not found in local
+        if (superclass != null) {
+            return superclass.findMethod(name);
         }
 
         return null;
