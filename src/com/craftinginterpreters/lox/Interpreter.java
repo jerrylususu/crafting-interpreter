@@ -228,7 +228,9 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
         Map<String, LoxFunction> methods = new HashMap<>();
         for (Stmt.Function method : stmt.methods) {
-            LoxFunction function = new LoxFunction(method, environment);
+            // determine initializer by check if method name is "init"
+            LoxFunction function = new LoxFunction(method, environment,
+                    method.name.lexeme.equals("init"));
             methods.put(method.name.lexeme, function);
         }
 
@@ -251,7 +253,9 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     public Void visitFunctionStmt(Stmt.Function stmt) {
         // capture the env when the function is declared, not called
         // the lexical scope surrounding the function declaration
-        LoxFunction function = new LoxFunction(stmt, environment);
+
+        // actual function declarations are never initializer
+        LoxFunction function = new LoxFunction(stmt, environment, false);
         environment.define(stmt.name.lexeme, function);
         return null;
     }

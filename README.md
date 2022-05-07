@@ -14,4 +14,6 @@ This repo contains mainly personal notes, in the form of code comment.
 - Chapter 8: Statements and state
 - Chapter 9: Control Flow
 - Chapter 10: Functions
+- Chapter 11: Resolving and Binding
+- Chapter 12: Classes
 

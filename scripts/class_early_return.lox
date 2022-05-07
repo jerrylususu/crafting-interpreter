@@ -1,0 +1,10 @@
+// section 12.7.2
+class Foo {
+  init() {
+    print "should show";
+    return;
+    print "should not show";
+  }
+}
+
+var f = Foo();
