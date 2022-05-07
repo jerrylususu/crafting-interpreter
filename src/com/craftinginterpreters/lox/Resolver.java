@@ -130,6 +130,17 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         declare(stmt.name);
         define(stmt.name);
 
+        if (stmt.superclass != null && stmt.name.lexeme.equals(stmt.superclass.name.lexeme)) {
+            Lox.error(stmt.superclass.name, "A class can't inherit from itself.");
+        }
+
+        // Lox allows class declarations even inside blocks,
+        // so it’s possible the superclass name refers to a local variable,
+        // therefore has the need to resolve
+        if (stmt.superclass != null) {
+            resolve(stmt.superclass);
+        }
+
         beginScope();
         // put "this" into scope so it can be resolved
         scopes.peek().put("this", true);
