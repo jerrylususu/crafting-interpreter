@@ -15,10 +15,12 @@ public class GenerateAst {
     defineAst(outputDir, "Expr", Arrays.asList(
       "Assign   : Token name, Expr value",
       "Binary   : Expr left, Token operator, Expr right",
-      "Call     : Expr callee, Token paren, List<Expr> arguments", // closing paren, location used for runtime error report
+      "Call     : Expr callee, Token paren, List<Expr> arguments", // closing paren, location used for runtime error report,
+      "Get      : Expr object, Token name", // get expressions, aka property access
       "Grouping : Expr expression",
       "Literal  : Object value",
       "Logical  : Expr left, Token operator, Expr right",
+      "Set      : Expr object, Token name, Expr value",
       "Unary    : Token operator, Expr right",
       "Variable:   Token name"
     ));

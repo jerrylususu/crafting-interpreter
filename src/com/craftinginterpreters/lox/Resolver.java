@@ -214,6 +214,14 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitGetExpr(Expr.Get expr) {
+        // properties are looked up dynamically and property access happens in the interpreter at runtime
+        // only resolve to the left of the dot
+        resolve(expr.object);
+        return null;
+    }
+
+    @Override
     public Void visitGroupingExpr(Expr.Grouping expr) {
         resolve(expr.expression);
         return null;
@@ -231,6 +239,15 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         // no short circuit in static analysis
         resolve(expr.left);
         resolve(expr.right);
+        return null;
+    }
+
+    @Override
+    public Void visitSetExpr(Expr.Set expr) {
+        // like Expr.Get, property is dynamically evaluated,
+        // no need to solve property (name) here.
+        resolve(expr.value);
+        resolve(expr.object);
         return null;
     }
 

@@ -245,11 +245,17 @@ class Parser {
       // recursion here to allow continuous assign
       // a = b = c = d = 1
 
-      // turns left-hand into an assignment target
+      // transform: turns left-hand into an assignment target
       if (expr instanceof Expr.Variable) {
         // r-value to l-value
         Token name = ((Expr.Variable)expr).name;
         return new Expr.Assign(name, value);
+      } else if (expr instanceof Expr.Get) {
+        // name is the identifier after the last dot on the left of equal
+        // example: breakfast.omelette.filling.meat = ham
+        // after: Expr.Set("breakfast.omelette.filling", "meat", "ham")
+        Expr.Get get = (Expr.Get) expr;
+        return new Expr.Set(get.object, get.name, value);
       }
 
       // report error but don't throw here, need to do synchronize
@@ -350,6 +356,9 @@ class Parser {
     while(true){
       if(match(LEFT_PAREN)) {
         expr = finishCall(expr);
+      } else if (match(DOT)) {
+        Token name = consume(IDENTIFIER, "Expect property name after '.'.");
+        expr = new Expr.Get(expr, name);
       } else {
         break;
       }
