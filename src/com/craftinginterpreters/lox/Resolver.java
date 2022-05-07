@@ -26,6 +26,8 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     // help to check whether the usage of "return" is valid
     private FunctionType currentFunction = FunctionType.NONE;
 
+
+
     Resolver(Interpreter interpreter) {
         this.interpreter = interpreter;
     }
@@ -35,6 +37,14 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         FUNCTION,
         METHOD
     }
+
+    private enum ClassType {
+        NONE,
+        CLASS
+    }
+
+    // helps to check if "this" is used outside a method
+    private ClassType currentClass = ClassType.NONE;
 
     void resolve(List<Stmt> statements) {
         for (Stmt statement : statements) {
@@ -113,8 +123,15 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitClassStmt(Stmt.Class stmt) {
+        ClassType enclosingClass = currentClass;
+        currentClass = ClassType.CLASS;
+
         declare(stmt.name);
         define(stmt.name);
+
+        beginScope();
+        // put "this" into scope so it can be resolved
+        scopes.peek().put("this", true);
 
         for (Stmt.Function method : stmt.methods) {
             // important for resolving "this"
@@ -122,6 +139,9 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
             resolveFunction(method, declaration);
         }
 
+        endScope();
+
+        currentClass = enclosingClass;
         return null;
     }
 
@@ -255,6 +275,19 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         // no need to solve property (name) here.
         resolve(expr.value);
         resolve(expr.object);
+        return null;
+    }
+
+    @Override
+    public Void visitThisExpr(Expr.This expr) {
+        // check if the use of "this" is valid (in a class method)
+        if (currentClass == ClassType.NONE) {
+            Lox.error(expr.keyword, "Can't use 'this' outside of a class.");
+        }
+
+        // resolve "this" just like any other variable
+        // "this" is just a reserved var name
+        resolveLocal(expr, expr.keyword);
         return null;
     }
 

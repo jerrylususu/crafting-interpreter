@@ -31,7 +31,7 @@ class LoxInstance {
 
         // if no matching (instance) field, try to find (class) methods
         LoxFunction method = klass.findMethod(name.lexeme);
-        if (method != null) return method;
+        if (method != null) return method.bind(this);
 
         throw new RuntimeError(name, "Undefined Property '" + name.lexeme + "'.");
     }
