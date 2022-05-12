@@ -5,7 +5,10 @@ The book: [Crafting Interpreters](http://craftinginterpreters.com/)
 This repo contains mainly personal notes, in the form of code comment.
 
 ## Current progress
+
 (Theory chapter, no code)
+
+### Part II: Tree-walk Interpreter
 
 - Chapter 4: Scanning
 - (Chapter 5: Representing Code)
@@ -17,4 +20,8 @@ This repo contains mainly personal notes, in the form of code comment.
 - Chapter 11: Resolving and Binding
 - Chapter 12: Classes
 - Chapter 13: Inheritance
+
+### Part III: Bytecode Virtual Machine
+
+- Chapter 14: Chunks of Bytecode
 
