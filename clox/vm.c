@@ -39,6 +39,16 @@ static InterpretResult run() {
 // read next byte and use it as index to look up the constant
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
 
+// handle binary operation
+// note: do-while trick: allow multiple statement in a block and having a trailing semicolon
+// note: pop out in reverse order (right first, left second)
+#define BINARY_OP(op) \
+    do {              \
+        double b = pop(); \
+        double a = pop(); \
+        push(a op b); \
+    } while (false)
+
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
         // show value stack
@@ -61,6 +71,11 @@ static InterpretResult run() {
                 push(constant);
                 break;
             }
+            case OP_ADD:      BINARY_OP(+); break;
+            case OP_SUBTRACT: BINARY_OP(-); break;
+            case OP_MULTIPLY: BINARY_OP(*); break;
+            case OP_DIVIDE:   BINARY_OP(/); break;
+            case OP_NEGATE: push(-pop()); break;
             case OP_RETURN: {
                 printValue(pop());
                 printf("\n");
@@ -71,6 +86,7 @@ static InterpretResult run() {
 
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef BINARY_OP
 }
 
 InterpretResult interpret(Chunk* chunk) {
