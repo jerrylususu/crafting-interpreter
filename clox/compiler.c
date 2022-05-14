@@ -17,6 +17,7 @@ void compile(const char* source) {
         }
 
         // print the token
+        // %2d: token type index
         // %.*s allows the length (precision) to be dynamically controlled
         // token is just offset into the source char array, no null terminator
         printf("%2d '%.*s'\n", token.type, token.length, token.start);

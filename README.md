@@ -25,4 +25,5 @@ This repo contains mainly personal notes, in the form of code comment.
 
 - Chapter 14: Chunks of Bytecode
 - Chapter 15: A Virtual Machine
+- Chapter 16: Scanning on Demand
 
