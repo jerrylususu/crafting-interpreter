@@ -123,6 +123,22 @@ static void parsePrecedence(Precedence precedence) {
     // What goes here?
 }
 
+static void binary() {
+    TokenType operatorType = parser.previous.type;
+    ParseRule* rule = getRule(operatorType);
+    // Each binary operator’s right-hand operand precedence is one level higher than its own,
+    // because the binary operators are left-associative.
+    parsePrecedence((Precedence)(rule->precedence + 1));
+
+    switch (operatorType) {
+        case TOKEN_PLUS:          emitByte(OP_ADD); break;
+        case TOKEN_MINUS:         emitByte(OP_SUBTRACT); break;
+        case TOKEN_STAR:          emitByte(OP_MULTIPLY); break;
+        case TOKEN_SLASH:         emitByte(OP_DIVIDE); break;
+        default: return; // Unreachable.
+    }
+}
+
 static void expression() {
     parsePrecedence(PREC_ASSIGNMENT);
 }
