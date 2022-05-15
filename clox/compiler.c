@@ -12,6 +12,21 @@ typedef struct {
     bool panicMode; // error will be suppressed if in panic mode, ends when the parser reach sync point
 } Parser;
 
+// all of Lox's precedence levels, from lowest to highest
+typedef enum {
+    PREC_NONE,
+    PREC_ASSIGNMENT,  // =
+    PREC_OR,          // or
+    PREC_AND,         // and
+    PREC_EQUALITY,    // == !=
+    PREC_COMPARISON,  // < > <= >=
+    PREC_TERM,        // + -
+    PREC_FACTOR,      // * /
+    PREC_UNARY,       // ! -
+    PREC_CALL,        // . ()
+    PREC_PRIMARY
+} Precedence;
+
 Parser parser;
 Chunk* compilingChunk;
 
@@ -84,10 +99,65 @@ static void emitReturn() {
     emitByte(OP_RETURN);
 }
 
+static uint8_t makeConstant(Value value) {
+    int constant = addConstant(currentChunk(), value);
+    if (constant > UINT8_MAX) {
+        error("Too many constants in one chunk.");
+        return 0;
+    }
+
+    return (uint8_t)constant;
+}
+
+static void emitConstant(Value value) {
+    emitBytes(OP_CONSTANT, makeConstant(value));
+}
+
 static void endCompiler() {
     // in this chapter, our VM only deals with one expression.
     emitReturn();
 }
+
+// start at the current token, and parses any expression at the given precedence level or higher
+static void parsePrecedence(Precedence precedence) {
+    // What goes here?
+}
+
+static void expression() {
+    parsePrecedence(PREC_ASSIGNMENT);
+}
+
+static void grouping() {
+    // for backend, there is nothing to a grouping expression
+    // Its sole function is syntactic, letting you insert a lower-precedence expression
+    // where a higher precedence is expected.
+    // no runtime semantic on its own and doesn't emit any bytecode
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
+}
+
+static void number() {
+    // `strtod`'s 2nd param EndPtr points to the location after the number
+    // not needed here, as we will scan and parse manually
+    double value = strtod(parser.previous.start, NULL);
+    emitConstant(value);
+}
+
+static void unary() {
+    TokenType operatorType = parser.previous.type;
+
+    // Compile the operand. (with correct precedence level limit)
+    parsePrecedence(PREC_UNARY);
+
+    // Emit the operator instruction.
+    switch (operatorType) {
+        case TOKEN_MINUS: emitByte(OP_NEGATE); break;
+        default: return; // Unreachable;
+    }
+}
+
+
+
 
 bool compile(const char* source, Chunk* chunk) {
     initScanner(source);
