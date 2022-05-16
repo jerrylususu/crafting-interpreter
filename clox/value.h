@@ -3,7 +3,20 @@
 
 #include "common.h"
 
-typedef double Value;
+// VM types, not user types
+typedef enum {
+    VAL_BOOL,
+    VAL_NIL,
+    VAL_NUMBER,
+} ValueType;
+
+typedef struct {
+    ValueType type;
+    union {
+        bool boolean;
+        double number;
+    } as;
+} Value;
 
 typedef struct {
     int capacity;
