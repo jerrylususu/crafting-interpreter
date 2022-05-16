@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdio.h>
 
 #include "common.h"
@@ -9,6 +10,22 @@ VM vm;
 
 static void resetStack() {
     vm.stackTop = vm.stack;
+}
+
+static void runtimeError(const char* format, ...) {
+    // forward formatting to printf
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fputs("\n", stderr);
+
+    // interpreter advance past each instruction before executing it
+    // when calling `runtimeError`, the failed instruction is the previous one
+    size_t instruction = vm.ip - vm.chunk->code - 1;
+    int line = vm.chunk->lines[instruction];
+    fprintf(stderr, "[line %d] in script\n", line);
+    resetStack();
 }
 
 void initVM() {
@@ -30,6 +47,12 @@ Value pop() {
     return *vm.stackTop;
 }
 
+// return a Value from stack, but doesn't pop it
+// `distance`: 0 is the top, 1 is one slot down
+static Value peek(int distance) {
+    return vm.stackTop[-1 - distance];
+}
+
 static InterpretResult run() {
 // make that scoping more explicit
 
@@ -43,11 +66,15 @@ static InterpretResult run() {
 // handle binary operation
 // note: do-while trick: allow multiple statement in a block and having a trailing semicolon
 // note: pop out in reverse order (right first, left second)
-#define BINARY_OP(op) \
-    do {              \
-        double b = pop(); \
-        double a = pop(); \
-        push(a op b); \
+#define BINARY_OP(valueType, op) \
+    do {  \
+        if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
+            runtimeError("Operands must be numbers."); \
+            return INTERPRET_RUNTIME_ERROR; \
+        } \
+        double b = AS_NUMBER(pop()); \
+        double a = AS_NUMBER(pop()); \
+        push(valueType(a op b)); \
     } while (false)
 
     for (;;) {
@@ -72,11 +99,17 @@ static InterpretResult run() {
                 push(constant);
                 break;
             }
-            case OP_ADD:      BINARY_OP(+); break;
-            case OP_SUBTRACT: BINARY_OP(-); break;
-            case OP_MULTIPLY: BINARY_OP(*); break;
-            case OP_DIVIDE:   BINARY_OP(/); break;
-            case OP_NEGATE: push(-pop()); break;
+            case OP_ADD:      BINARY_OP(NUMBER_VAL, +); break;
+            case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -); break;
+            case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
+            case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, /); break;
+            case OP_NEGATE:
+                if (!IS_NUMBER(peek(0))) {
+                    runtimeError("Operand must be a number.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                push(NUMBER_VAL(-AS_NUMBER(pop())));
+                break;
             case OP_RETURN: {
                 printValue(pop());
                 printf("\n");

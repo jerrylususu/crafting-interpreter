@@ -173,7 +173,7 @@ static void number() {
     // `strtod`'s 2nd param EndPtr points to the location after the number
     // not needed here, as we will scan and parse manually
     double value = strtod(parser.previous.start, NULL);
-    emitConstant(value);
+    emitConstant(NUMBER_VAL(value));
 }
 
 static void unary() {
