@@ -18,6 +18,7 @@ typedef enum {
 // base class for heap-allocated objects
 struct Obj {
     ObjType type;
+    struct Obj* next;
 };
 
 struct ObjString {

@@ -13,6 +13,12 @@
 static Obj* allocateObject(size_t size, ObjType type) {
     Obj* object = (Obj*) reallocate(NULL, 0, size);
     object->type = type;
+
+    // insert the new object at the head of the linked list
+    // therefore no need to maintain its tail
+    object->next = vm.objects;
+    vm.objects = object;
+
     return object;
 }
 

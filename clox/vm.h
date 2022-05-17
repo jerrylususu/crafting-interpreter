@@ -11,6 +11,7 @@ typedef struct {
     uint8_t* ip; // instruction pointer (next to be used)
     Value stack[STACK_MAX]; // value stack
     Value* stackTop; // where the next value to be pushed will go (not the top)
+    Obj* objects; // a linked list of heap-allocated objects
 } VM;
 
 typedef enum {
@@ -18,6 +19,8 @@ typedef enum {
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR
 } InterpretResult;
+
+extern VM vm;
 
 void initVM();
 void freeVM();
