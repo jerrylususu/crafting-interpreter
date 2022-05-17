@@ -26,7 +26,9 @@ struct ObjString {
     char* chars;
 };
 
+ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
+void printObject(Value value);
 
 // use a function to prevent evaluate parameter multiple times
 // as the expression evaluated might have side effect
