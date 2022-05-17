@@ -26,6 +26,8 @@ struct ObjString {
     char* chars;
 };
 
+ObjString* copyString(const char* chars, int length);
+
 // use a function to prevent evaluate parameter multiple times
 // as the expression evaluated might have side effect
 static inline bool isObjType(Value value, ObjType type) {
