@@ -3,6 +3,10 @@
 
 #include "common.h"
 
+// forward declare to fix cyclic dependencies
+typedef struct Obj Obj;
+typedef struct ObjString ObjString;
+
 // VM types, not user types
 typedef enum {
     VAL_BOOL,
@@ -37,7 +41,7 @@ typedef struct {
 #define BOOL_VAL(value)   ((Value){VAL_BOOL, {.boolean = value}})
 #define NIL_VAL           ((Value){VAL_NIL, {.number = 0}})
 #define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})
-#define OBJ_VAL(value)    ((Value){VAL_OBJ, {.obj = (Obj*)object}})
+#define OBJ_VAL(object)   ((Value){VAL_OBJ, {.obj = (Obj*)object}})
 
 typedef struct {
     int capacity;
