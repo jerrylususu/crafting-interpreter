@@ -39,7 +39,7 @@ static Entry* findEntry(Entry* entries, int capacity, ObjString* key) {
                 // save the location of first tombstone
                 if (tombstone == NULL) tombstone = entry;
             }
-        } else if (entry->key == key) {
+        } else if (entry->key == key) { // equality relies on String Interning
             // We found the key.
             return entry;
         }
@@ -136,5 +136,29 @@ void tableAddAll(Table* from, Table* to) {
         if (entry->key != NULL) {
             tableSet(to, entry->key, entry->value);
         }
+    }
+}
+
+
+// basically `findEntry`, but checks actual strings (instead of pointer)
+ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t hash) {
+    if (table->count == 0) return NULL;
+
+    uint32_t index = hash % table->capacity;
+    for (;;) {
+        Entry* entry = &table->entries[index];
+        if (entry->key == NULL) { // if the slot is empty or tombstone
+            // Stop if we find an empty non-tombstone entry.
+            if (IS_NIL(entry->value)) return NULL;
+            // otherwise found a tombstone, need to keep searching
+        } else if (entry->key->length == length &&
+                    entry->key->hash == hash &&
+                memcmp(entry->key->chars, chars, length) == 0) {
+            // note: the only place in VM where we actually test strings for textual equality
+            // We found it.
+            return entry->key;
+        }
+
+        index = (index + 1) % table->capacity;
     }
 }

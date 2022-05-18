@@ -29,3 +29,7 @@ This repo contains mainly personal notes, in the form of code comment.
 - Chapter 17: Compiling Expressions
 - Chapter 18: Types of Values
 - Chapter 19: Strings
+  - Struct Inheritance
+  - Design Note: String Encoding
+- Chapter 20: Hash Table
+  - String Interning

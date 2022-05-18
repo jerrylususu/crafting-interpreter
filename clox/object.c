@@ -3,6 +3,7 @@
 
 #include "memory.h"
 #include "object.h"
+#include "table.h"
 #include "value.h"
 #include "vm.h"
 
@@ -28,6 +29,9 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
     string->length = length;
     string->chars = chars;
     string->hash = hash;
+    // intern the new string
+    // note: in clox, all strings are interned
+    tableSet(&vm.strings, string, NIL_VAL);
     return string;
 }
 
@@ -44,6 +48,15 @@ static uint32_t hashString(const char* key, int length) {
 // claims ownership of `chars` passed in
 ObjString* takeString(char* chars, int length) {
     uint32_t hash = hashString(chars, length);
+
+    // if already exist a same string, return the reference to it
+    ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+    if (interned != NULL) {
+        // already obtained ownership, no longer need the duplicate string
+        FREE_ARRAY(char, chars, length + 1);
+        return interned;
+    }
+
     return allocateString(chars, length, hash);
 }
 
@@ -52,6 +65,11 @@ ObjString* takeString(char* chars, int length) {
 // assumes it can not take ownership of `chars` passed in
 ObjString* copyString(const char* chars, int length) {
     uint32_t hash = hashString(chars, length);
+
+    // if already exist a same string, just return the reference to it, and skip the copying
+    ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+    if (interned != NULL) return interned;
+
     char* heapChars = ALLOCATE(char, length + 1);
     memcpy(heapChars, chars, length);
     // make a null-terminated c-string for ease of use
