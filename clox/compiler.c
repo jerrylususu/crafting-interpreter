@@ -98,6 +98,18 @@ static void consume(TokenType type, const char* message) {
     errorAtCurrent(message);
 }
 
+static bool check(TokenType type) {
+    return parser.current.type == type;
+}
+
+// only consume the token if type is as expected
+// but leave the token alone when unmatched, so it can be matched by other type later
+static bool match(TokenType type) {
+    if (!check(type)) return false;
+    advance();
+    return true;
+}
+
 static void emitByte(uint8_t byte) {
     writeChunk(currentChunk(), byte, parser.previous.line);
 }
@@ -137,6 +149,8 @@ static void endCompiler() {
 }
 
 static void expression();
+static void statement();
+static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
@@ -175,6 +189,67 @@ static void literal() {
 
 static void expression() {
     parsePrecedence(PREC_ASSIGNMENT);
+}
+
+// evaluate the expression and discard the result
+// used to invoke side effect
+static void expressionStatement() {
+    expression();
+    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+    emitByte(OP_POP);
+}
+
+static void printStatement() {
+    // `print` has been consumed, just parse and compile the expression after it
+    expression();
+    consume(TOKEN_SEMICOLON, "Expect ';' after value.");
+    emitByte(OP_PRINT);
+}
+
+// skip tokens until we reach something that looks like a statement boundary
+static void synchronize() {
+    parser.panicMode = false;
+
+    while (parser.current.type != TOKEN_EOF) {
+        // look for a preceding token that can end a statement, like a semicolon
+        if (parser.previous.type == TOKEN_SEMICOLON) return;
+
+        // look for a subsequent token that begins a statement
+        // usually one of the control flow or declaration keywords
+        switch (parser.current.type) {
+            case TOKEN_CLASS:
+            case TOKEN_FUN:
+            case TOKEN_VAR:
+            case TOKEN_FOR:
+            case TOKEN_IF:
+            case TOKEN_WHILE:
+            case TOKEN_PRINT:
+            case TOKEN_RETURN:
+                return;
+
+            default:
+                ; // Do nothing.
+        }
+
+        advance();
+    }
+}
+
+static void declaration() {
+    // just for now, will get into var declaration later
+    statement();
+
+    // if we hit a compile error while parsing the previous statement, enter panic mode
+    // after the erroneous statement, start synchronizing
+    if (parser.panicMode) synchronize();
+}
+
+static void statement() {
+    if (match(TOKEN_PRINT)) {
+        printStatement();
+    } else {
+        expressionStatement();
+    }
 }
 
 static void grouping() {
@@ -297,7 +372,12 @@ bool compile(const char* source, Chunk* chunk) {
     parser.panicMode = false;
 
     advance();
-    expression();
+
+    // keep compiling declarations until hit the end
+    while (!match(TOKEN_EOF)) {
+        declaration();
+    }
+
     consume(TOKEN_EOF, "Expect end of expression.");
     endCompiler();
     return !parser.hadError;
