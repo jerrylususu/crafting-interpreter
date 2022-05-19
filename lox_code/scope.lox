@@ -4,27 +4,27 @@ var c = "global c";
 {
   var a = "outer a";
   var b = "outer b";
-  print a;
-  print b;
-  print c;
+  print a; // outer a
+  print b; // outer b
+  print c; // global c
 
   {
     var a = "inner a";
-    print a;
-    print b;
-    print c;
+    print a; // inner a
+    print b; // outer b
+    print c; // global c
 
     b = "inner mod b";
     c = "inner mod c";
-    print a;
-    print b;
-    print c;
+    print a; // inner a
+    print b; // inner mod b
+    print c; // inner mod c
 
   }
-  print a;
-  print b;
-  print c;
+  print a; // outer a
+  print b; // inner mod b
+  print c; // inner mod c
 }
-print a;
-print b;
-print c;
+print a; // global a
+print b; // global b
+print c; // inner mod c

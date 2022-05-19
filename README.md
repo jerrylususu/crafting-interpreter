@@ -34,3 +34,4 @@ This repo contains mainly personal notes, in the form of code comment.
 - Chapter 20: Hash Table
   - String Interning
 - Chapter 21: Global Variables
+- Chapter 22: Local Variables

@@ -202,6 +202,27 @@ static bool identifiersEqual(Token* a, Token* b) {
     return memcmp(a->start, b->start, a->length) == 0;
 }
 
+// note: value stack and locals stack is in always in sync!
+// (statement won't affect the stack, and only variable declaration will leave a value on stack)
+static int resolveLocal(Compiler* compiler, Token* name) {
+    // walk backward to find the *last* declared variable with the name
+    // ensure inner local variable correctly shadow locals with the same name in surrounding scopes
+    for (int i = compiler->localCount - 1; i >= 0; i--) {
+        Local* local = &compiler->locals[i];
+        if (identifiersEqual(name, &local->name)) {
+
+            // variable is still in an "uninitialized" state
+            if (local->depth == -1) {
+                error("Can't read local variable in its own initializer.");
+            }
+
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 static void addLocal(Token name) {
     if (current->localCount == UINT8_COUNT) {
         error("Too many local variables in function.");
@@ -213,10 +234,13 @@ static void addLocal(Token name) {
     // note: lifetime of the string for the variable's name is the same as the source code
     local->name = name;
     local->depth = current->scopeDepth;
+
+    // mark the new variable as "uninitialized"
+    local->depth = -1;
 }
 
 // let the compiler record the existence of a local variable
-// add a local variable to compiler's list of variables in current scope
+// declare: add a local variable to compiler's list of variables in current scope
 static void declareVariable() {
     // global var is `late-bound`, compiler doesn't track its declaration
     if (current->scopeDepth == 0) return;
@@ -229,6 +253,7 @@ static void declareVariable() {
 
         // current scope is always at the end of the array (since local vars are appended when declared)
         // if found a variable owned by another scope, we have checked all existing variables in current scope
+        // depth == -1: variable is uninitialized
         if (local->depth != -1 && local->depth < current->scopeDepth) {
             break;
         }
@@ -253,10 +278,16 @@ static uint8_t parseVariable(const char* errorMessage) {
     return identifierConstant(&parser.previous);
 }
 
+static void markInitialized() {
+    current->locals[current->localCount - 1].depth = current->scopeDepth;
+}
+
+// define: mark the variable as it is available (ready) for use
 static void defineVariable(uint8_t global) {
     // for local variables, after executing its initializer, a temp value is generated at the top of stack
     // just use that "temp" value as the real, local variable
     if (current->scopeDepth > 0) {
+        markInitialized();
         return;
     }
 
@@ -423,14 +454,25 @@ static void string(bool canAssign) {
 }
 
 static void namedVariable(Token name, bool canAssign) {
-    uint8_t arg = identifierConstant(&name);
+    uint8_t getOp, setOp;
+    // first try to resolve the variable in local scope, if failed try resolve in global scope
+    // use `int` instead of `uint_8` so -1 can indicate not found.
+    int arg = resolveLocal(current, &name);
+    if (arg != -1) {
+        getOp = OP_GET_LOCAL;
+        setOp = OP_SET_LOCAL;
+    } else {
+        arg = identifierConstant(&name);
+        getOp = OP_GET_GLOBAL;
+        setOp = OP_SET_GLOBAL;
+    }
 
     // look for an equal sign after identifier, to determine whether this is a set or a get
     if (canAssign && match(TOKEN_EQUAL)) {
         expression();
-        emitBytes(OP_SET_GLOBAL, arg);
+        emitBytes(setOp, (uint8_t)arg);
     } else {
-        emitBytes(OP_GET_GLOBAL, arg);
+        emitBytes(getOp, (uint8_t)arg);
     }
 }
 
