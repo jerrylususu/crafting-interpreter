@@ -12,6 +12,7 @@ typedef struct {
     uint8_t* ip; // instruction pointer (next to be used)
     Value stack[STACK_MAX]; // value stack
     Value* stackTop; // where the next value to be pushed will go (not the top)
+    Table globals; // global variables
     Table strings; // a hash table (set) for all interned strings
     Obj* objects; // a linked list of heap-allocated objects
 } VM;

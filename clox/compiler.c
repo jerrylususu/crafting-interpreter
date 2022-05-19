@@ -154,6 +154,21 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
+// takes the given token and adds its lexeme to the chunk's constant table as a string
+// returns the index of that constant in the constant table
+static uint8_t identifierConstant(Token* name) {
+    return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
+}
+
+static uint8_t parseVariable(const char* errorMessage) {
+    consume(TOKEN_IDENTIFIER, errorMessage);
+    return identifierConstant(&parser.previous);
+}
+
+static void defineVariable(uint8_t global) {
+    emitBytes(OP_DEFINE_GLOBAL, global);
+}
+
 static void binary() {
     TokenType operatorType = parser.previous.type;
     ParseRule* rule = getRule(operatorType);
@@ -189,6 +204,26 @@ static void literal() {
 
 static void expression() {
     parsePrecedence(PREC_ASSIGNMENT);
+}
+
+static void varDeclaration() {
+    // add the variable name to constant table
+    uint8_t global = parseVariable("Expect variable name.");
+
+    // evaluate initializer expression
+    // result is saved on stack
+    if (match(TOKEN_EQUAL)) {
+        expression();
+    } else {
+        // implicitly initializes to `nil`
+        emitByte(OP_NIL);
+    }
+
+    consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
+
+    // defines the new variable and stores its initial value
+    // initial value is left on the stack
+    defineVariable(global);
 }
 
 // evaluate the expression and discard the result
@@ -236,8 +271,11 @@ static void synchronize() {
 }
 
 static void declaration() {
-    // just for now, will get into var declaration later
-    statement();
+    if (match(TOKEN_VAR)) {
+        varDeclaration();
+    } else {
+        statement();
+    }
 
     // if we hit a compile error while parsing the previous statement, enter panic mode
     // after the erroneous statement, start synchronizing
