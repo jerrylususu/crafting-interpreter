@@ -31,7 +31,9 @@ typedef enum {
     PREC_PRIMARY
 } Precedence;
 
-typedef void (*ParseFn)(); // a function taking no argument and returns nothing
+// even `canAssign` is only useful for setter and assignment
+// C compiler requires all parse functions have the same type
+typedef void (*ParseFn)(bool canAssign);
 
 typedef struct {
     ParseFn prefix;
@@ -169,7 +171,7 @@ static void defineVariable(uint8_t global) {
     emitBytes(OP_DEFINE_GLOBAL, global);
 }
 
-static void binary() {
+static void binary(bool canAssign) {
     TokenType operatorType = parser.previous.type;
     ParseRule* rule = getRule(operatorType);
     // Each binary operator’s right-hand operand precedence is one level higher than its own,
@@ -193,7 +195,7 @@ static void binary() {
 
 // directly push true/false/nil on the stack
 // instead of storing on constant table, as they have only 3 values
-static void literal() {
+static void literal(bool canAssign) {
     switch (parser.previous.type) {
         case TOKEN_FALSE: emitByte(OP_FALSE); break;
         case TOKEN_NIL: emitByte(OP_NIL); break;
@@ -290,7 +292,7 @@ static void statement() {
     }
 }
 
-static void grouping() {
+static void grouping(bool canAssign) {
     // for backend, there is nothing to a grouping expression
     // Its sole function is syntactic, letting you insert a lower-precedence expression
     // where a higher precedence is expected.
@@ -299,14 +301,14 @@ static void grouping() {
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
-static void number() {
+static void number(bool canAssign) {
     // `strtod`'s 2nd param EndPtr points to the location after the number
     // not needed here, as we will scan and parse manually
     double value = strtod(parser.previous.start, NULL);
     emitConstant(NUMBER_VAL(value));
 }
 
-static void string() {
+static void string(bool canAssign) {
     // +1 and -2: trim the leading and trailing quotation marks
     // note: Lox don't support string escape sequence ('\n'), which could be processed here
 
@@ -316,16 +318,23 @@ static void string() {
                                     parser.previous.length - 2)));
 }
 
-static void namedVariable(Token name) {
+static void namedVariable(Token name, bool canAssign) {
     uint8_t arg = identifierConstant(&name);
-    emitBytes(OP_GET_GLOBAL, arg);
+
+    // look for an equal sign after identifier, to determine whether this is a set or a get
+    if (canAssign && match(TOKEN_EQUAL)) {
+        expression();
+        emitBytes(OP_SET_GLOBAL, arg);
+    } else {
+        emitBytes(OP_GET_GLOBAL, arg);
+    }
 }
 
-static void variable() {
-    namedVariable(parser.previous);
+static void variable(bool canAssign) {
+    namedVariable(parser.previous, canAssign);
 }
 
-static void unary() {
+static void unary(bool canAssign) {
     TokenType operatorType = parser.previous.type;
 
     // Compile the operand. (with correct precedence level limit)
@@ -393,7 +402,12 @@ static void parsePrecedence(Precedence precedence) {
         return;
     }
 
-    prefixRule();
+    // only allow assignment when parsing an assignment expression
+    // or top-level expression like in an expression statement
+    // fixes `a * b = c + d`, see Section 21.4
+    // if the variable is nested in higher precedence expression, `canAssign` will be false, and `=` will be ignored
+    bool canAssign = precedence <= PREC_ASSIGNMENT;
+    prefixRule(canAssign);
 
     // prefix expression parse done, now look for an infix parser
     // if found, the prefix expression is might be its left operand
@@ -401,7 +415,13 @@ static void parsePrecedence(Precedence precedence) {
     while (precedence <= getRule(parser.current.type)->precedence) {
         advance();
         ParseFn infixRule = getRule(parser.previous.type)->infix;
-        infixRule();
+        infixRule(canAssign);
+    }
+
+    // `=` doesn't get consumed, indicating in further parsing the precedence isn't low enough (See section 21.4)
+    // if `canAssign` is true, and assignment is allowed, `=` should get consumed
+    if (canAssign && match(TOKEN_EQUAL)) {
+        error("Invalid assignment target.");
     }
 }
 

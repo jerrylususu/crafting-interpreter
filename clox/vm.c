@@ -154,6 +154,18 @@ static InterpretResult run() {
                 pop();
                 break;
             }
+            case OP_SET_GLOBAL: {
+                ObjString* name = READ_STRING();
+                if (tableSet(&vm.globals, name, peek(0))) {
+                    // call to `tableSet` stores the variable, even if the variable wasn't defined
+                    // (tableSet returns true if the key is new)
+                    // need to delete the zombie value from the table
+                    tableDelete(&vm.globals, name);
+                    runtimeError("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
             case OP_EQUAL: {
                 Value b = pop();
                 Value a = pop();

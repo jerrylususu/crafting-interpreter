@@ -33,3 +33,4 @@ This repo contains mainly personal notes, in the form of code comment.
   - Design Note: String Encoding
 - Chapter 20: Hash Table
   - String Interning
+- Chapter 21: Global Variables
