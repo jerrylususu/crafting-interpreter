@@ -414,6 +414,63 @@ static void expressionStatement() {
     emitByte(OP_POP);
 }
 
+static void forStatement() {
+    beginScope(); // new variable may be declared
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+
+    // initializer clause
+    // note: when processing initializer, the semicolon followed will also be consumed
+    if (match(TOKEN_SEMICOLON)) {
+        // No initializer.
+    } else if (match(TOKEN_VAR)) {
+        varDeclaration();
+    } else {
+        expressionStatement();
+    }
+
+    // conditional clause (Section 23.4.2)
+    int loopStart = currentChunk()->count;
+    int exitJump = -1; // condition clause is optional
+    if (!match(TOKEN_SEMICOLON)) {
+        expression();
+        consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+
+        // Jump out of the loop if the condition is false.
+        exitJump = emitJump(OP_JUMP_IF_FALSE);
+        emitByte(OP_POP); // Condition.
+    }
+
+    // increment clause (Section 23.4.3)
+    // executed at the end of each iteration (init -> cond -> body -> incr -> cond ...)
+    if (!match(TOKEN_RIGHT_PAREN)) { // increment is optional
+        // jump to body when iteration begins
+        int bodyJump = emitJump(OP_JUMP);
+        int incrementStart = currentChunk()->count;
+        expression();
+        emitByte(OP_POP);
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+
+        // after increment is executed, jump back to condition
+        emitLoop(loopStart);
+        // after body is executed, jump back to increment
+        loopStart = incrementStart;
+        patchJump(bodyJump);
+    }
+
+    statement();
+    // jump back to the increment (if it exists)
+    emitLoop(loopStart);
+
+    // patch the exit jump after loop body (when there is a conditional clause)
+    if (exitJump != -1) {
+        patchJump(exitJump);
+        // the jump leaves the value on stack, need to discard it
+        emitByte(OP_POP); // Condition.
+    }
+
+    endScope();
+}
+
 static void ifStatement() {
     // note: left paren before if condition is purely declarative (to balance the paren)
     consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
@@ -506,6 +563,8 @@ static void declaration() {
 static void statement() {
     if (match(TOKEN_PRINT)) {
         printStatement();
+    } else if (match(TOKEN_FOR)) {
+        forStatement();
     } else if (match(TOKEN_IF)) {
         ifStatement();
     } else if (match(TOKEN_WHILE)) {

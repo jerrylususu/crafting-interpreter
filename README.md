@@ -35,3 +35,6 @@ This repo contains mainly personal notes, in the form of code comment.
   - String Interning
 - Chapter 21: Global Variables
 - Chapter 22: Local Variables
+  - Value stack and Locals stack is always in sync!
+- Chapter 23: Jumping Back and Forth
+  - Control Flow
