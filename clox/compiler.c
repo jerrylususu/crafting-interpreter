@@ -134,6 +134,17 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
     emitByte(byte2);
 }
 
+// emit a bytecode instruction and write a placeholder operand for jump offset
+static int emitJump(uint8_t instruction) {
+    emitByte(instruction);
+    emitByte(0xff);
+    emitByte(0xff);
+
+    // currentChunk()->count is the *next* slot to be written into
+    // return the offset of the operand?
+    return currentChunk()->count - 2;
+}
+
 static void emitReturn() {
     emitByte(OP_RETURN);
 }
@@ -150,6 +161,19 @@ static uint8_t makeConstant(Value value) {
 
 static void emitConstant(Value value) {
     emitBytes(OP_CONSTANT, makeConstant(value));
+}
+
+static void patchJump(int offset) {
+    // -2 to adjust for the bytecode for the jump offset itself.
+    int jump = currentChunk()->count - offset - 2;
+
+    if (jump > UINT16_MAX) {
+        error("Too much code to jump over.");
+    }
+
+    // array index starts from 0, code[offset] is the first half of jump operand
+    currentChunk()->code[offset] = (jump >> 8) & 0xff;
+    currentChunk()->code[offset + 1] = jump & 0xff;
 }
 
 static void initCompiler(Compiler* compiler) {
@@ -367,6 +391,31 @@ static void expressionStatement() {
     emitByte(OP_POP);
 }
 
+static void ifStatement() {
+    // note: left paren before if condition is purely declarative (to balance the paren)
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
+    // at runtime, the condition value will be left on the top of the stack
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+
+    // backpatching: use a placeholder for the jump operand
+    int thenJump = emitJump(OP_JUMP_IF_FALSE);
+    // pop the condition value out of stack, before getting into `then` branch
+    emitByte(OP_POP);
+    statement();
+
+    // add an unconditional jump after `then` branch to prevent fallthrough into `else` branch
+    int elseJump = emitJump(OP_JUMP);
+
+    // backpactching: set the jump operand to the actual jump offset
+    patchJump(thenJump);
+    // pop the condition value out of stack, before getting into `else` branch
+    emitByte(OP_POP);
+
+    if (match(TOKEN_ELSE)) statement();
+    patchJump(elseJump);
+}
+
 static void printStatement() {
     // `print` has been consumed, just parse and compile the expression after it
     expression();
@@ -418,6 +467,8 @@ static void declaration() {
 static void statement() {
     if (match(TOKEN_PRINT)) {
         printStatement();
+    } else if (match(TOKEN_IF)) {
+        ifStatement();
     } else if (match(TOKEN_LEFT_BRACE)) {
         beginScope();
         block();
