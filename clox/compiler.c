@@ -204,7 +204,7 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
     compiler->function = newFunction();
     current = compiler;
 
-    // compiler implicitly claims stack slot 0 for VM's internal use
+    // compiler implicitly claims stack slot 0 for VM's internal use (storing the function being called)
     // give it an empty name so user can not refer to it
     Local* local = &current->locals[current->localCount++];
     local->depth = 0;
