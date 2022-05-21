@@ -1,5 +1,6 @@
-fun areWeHavingItYet() {
-  print "Yes we are!";
+fun noReturn() {
+  print "Do stuff";
+  // No return here.
 }
 
-print areWeHavingItYet;
+print noReturn(); // should be nil

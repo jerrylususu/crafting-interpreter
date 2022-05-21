@@ -24,12 +24,20 @@ static void runtimeError(const char* format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    // interpreter advance past each instruction before executing it
-    // when calling `runtimeError`, the failed instruction is the previous one
-    CallFrame* frame = &vm.frames[vm.frameCount - 1];
-    size_t instruction = frame->ip - frame->function->chunk.code - 1;
-    int line = frame->function->chunk.lines[instruction];
-    fprintf(stderr, "[line %d] in script\n", line);
+    // print stack trace (innermost first)
+    for (int i = vm.frameCount - 1; i >= 0; i--) {
+        CallFrame* frame = &vm.frames[i];
+        ObjFunction* function = frame->function;
+        // -1: ip already sitting on the next instruction to be executed, but we want the previous failed instruction.
+        size_t instruction = frame->ip - function->chunk.code - 1;
+        fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
+        if (function->name == NULL) {
+            fprintf(stderr, "script\n");
+        } else {
+            fprintf(stderr, "%s()\n", function->name->chars);
+        }
+    }
+
     resetStack();
 }
 
@@ -61,6 +69,42 @@ Value pop() {
 // `distance`: 0 is the top, 1 is one slot down
 static Value peek(int distance) {
     return vm.stackTop[-1 - distance];
+}
+
+// initializes the next CallFrame on the stack
+static bool call(ObjFunction* function, int argCount) {
+    if (argCount != function->arity) {
+        runtimeError("Expected %d arguments but got %d.", function->arity, argCount);
+        return false;
+    }
+
+    if (vm.frameCount == FRAMES_MAX) {
+        runtimeError("Stack overflow.");
+        return false;
+    }
+
+    CallFrame* frame = &vm.frames[vm.frameCount++];
+    frame->function = function;
+    frame->ip = function->chunk.code;
+    // ensure the argument already on the stack line up with parameters
+    // -1: account for stack slot 0 set aside by compiler (for when we add methods later)
+    // parameters starts at slot 1
+    frame->slots = vm.stackTop - argCount - 1;
+    return true;
+}
+
+// make sure the callee is indeed callable
+static bool callValue(Value callee, int argCount) {
+    if (IS_OBJ(callee)) {
+        switch (OBJ_TYPE(callee)) {
+            case OBJ_FUNCTION:
+                return call(AS_FUNCTION(callee), argCount);
+            default:
+                break; // Non-callable object type.
+        }
+    }
+    runtimeError("Can only call functions and classes.");
+    return false;
 }
 
 // in Lox, only `nil` and `false` are falsey
@@ -242,9 +286,32 @@ static InterpretResult run() {
                 frame->ip -= offset; // jump backwards
                 break;
             }
+            case OP_CALL: {
+                int argCount = READ_BYTE();
+                // peek(argCount): the function to be called
+                if (!callValue(peek(argCount), argCount)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                // update the (local) cached pointer of current frame in `run()`
+                // VM will read the `ip` from the new CallFrame in the next cycle
+                frame = &vm.frames[vm.frameCount - 1];
+                break;
+            }
             case OP_RETURN: {
-                // Exit interpreter.
-                return INTERPRET_OK;
+                // return value is at the top of value stack
+                Value result = pop();
+                // discard current CallFrame
+                vm.frameCount--;
+                if (vm.frameCount == 0) {
+                    pop();
+                    return INTERPRET_OK;
+                }
+
+                vm.stackTop = frame->slots;
+                // push the return value back to the value stack of previous frame
+                push(result);
+                frame = &vm.frames[vm.frameCount - 1];
+                break;
             }
         }
     }
@@ -262,10 +329,7 @@ InterpretResult interpret(const char* source) {
 
     // stack slot 0 used to store the function being called
     push(OBJ_VAL(function));
-    CallFrame* frame = &vm.frames[vm.frameCount++];
-    frame->function = function;
-    frame->ip = function->chunk.code;
-    frame->slots = vm.stack;
+    call(function, 0);
 
     return run();
 }
