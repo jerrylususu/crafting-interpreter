@@ -19,6 +19,13 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 // type-specific code to handle each object type's special needs of freeing
 static void freeObject(Obj* object) {
     switch (object->type) {
+        case OBJ_FUNCTION: {
+            ObjFunction* function = (ObjFunction*)object;
+            freeChunk(&function->chunk);
+            // note: function name (ObjString) will be handled by garbage collector (once we have one)
+            FREE(ObjFunction, object);
+            break;
+        }
         case OBJ_STRING: {
             ObjString* string = (ObjString*)object;
             FREE_ARRAY(char, string->chars, string->length + 1);
