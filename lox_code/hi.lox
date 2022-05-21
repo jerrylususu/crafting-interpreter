@@ -1,6 +1,5 @@
-fun noReturn() {
-  print "Do stuff";
-  // No return here.
+fun sum(a, b, c) {
+  return a + b + c;
 }
 
-print noReturn(); // should be nil
+print 4 + sum(5, 6, 7);
