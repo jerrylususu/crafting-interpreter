@@ -38,3 +38,5 @@ This repo contains mainly personal notes, in the form of code comment.
   - Value stack and Locals stack is always in sync!
 - Chapter 23: Jumping Back and Forth
   - Control Flow
+- Chapter 24: Calls and Functions
+  - Call Frame
