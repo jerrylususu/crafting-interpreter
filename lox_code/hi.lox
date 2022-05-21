@@ -1,5 +1,5 @@
-print("start");
-for(var a = 0; a < 5; a = a+1) {
-	print(a);
+fun areWeHavingItYet() {
+  print "Yes we are!";
 }
-print("done");
+
+print areWeHavingItYet;

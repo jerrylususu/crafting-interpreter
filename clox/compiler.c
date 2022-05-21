@@ -52,7 +52,10 @@ typedef enum {
     TYPE_SCRIPT
 } FunctionType;
 
-typedef struct {
+// specific to a single function
+typedef struct Compiler {
+    struct Compiler* enclosing; // nest Compiler structs as a stack (implemented using linked list)
+
     ObjFunction* function; // the function object being built
     FunctionType type; // top-level code (implicit `main()`) or function body
 
@@ -196,6 +199,7 @@ static void patchJump(int offset) {
 }
 
 static void initCompiler(Compiler* compiler, FunctionType type) {
+    compiler->enclosing = current;
     compiler->function = NULL;
     compiler->type = type;
     compiler->localCount = 0;
@@ -203,6 +207,11 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
     // note: NULL the `function` field and assign it later: garbage collection-related paranoia
     compiler->function = newFunction();
     current = compiler;
+    // function object outlives the compiler and persists until runtime
+    // yet the lexeme points to the original source code string, which might be freed after compiling
+    if (type != TYPE_SCRIPT) {
+        current->function->name = copyString(parser.previous.start, parser.previous.length);
+    }
 
     // compiler implicitly claims stack slot 0 for VM's internal use (storing the function being called)
     // give it an empty name so user can not refer to it
@@ -223,6 +232,7 @@ static ObjFunction* endCompiler() {
     }
 #endif
 
+    current = current->enclosing;
     return function;
 }
 
@@ -336,6 +346,8 @@ static uint8_t parseVariable(const char* errorMessage) {
 }
 
 static void markInitialized() {
+    // only local variables can be marked as "initialized", all global variables are automatically "initialized"
+    if (current->scopeDepth == 0) return;
     current->locals[current->localCount - 1].depth = current->scopeDepth;
 }
 
@@ -405,6 +417,43 @@ static void block() {
     }
 
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
+}
+
+static void function(FunctionType type) {
+    Compiler compiler;
+    initCompiler(&compiler, type);
+    // `beginScope` has no corresponding `endScope`, because we end Compiler entirely when
+    // we reach end of function body, and there is no need to close the lingering outermost scope
+    beginScope();
+
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            current->function->arity++;
+            if (current->function->arity > 255) {
+                errorAtCurrent("Can't have more than 255 parameters.");
+            }
+            // Semantically, a parameter is simply a local variable declared in the outermost lexical scope
+            // of the function body, but without initializers (will be initialized when function is called).
+            uint8_t constant = parseVariable("Expect parameter name.");
+            defineVariable(constant);
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+    block();
+
+    ObjFunction* function = endCompiler();
+    emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
+}
+
+static void funDeclaration() {
+    uint8_t global = parseVariable("Expect function name.");
+    // mark the function declaration's variable "initialized" as soon as the name is compiled
+    // allow function to refer to itself in its body (for recursion)
+    markInitialized();
+    function(TYPE_FUNCTION);
+    defineVariable(global);
 }
 
 static void varDeclaration() {
@@ -570,7 +619,9 @@ static void synchronize() {
 }
 
 static void declaration() {
-    if (match(TOKEN_VAR)) {
+    if (match(TOKEN_FUN)) {
+        funDeclaration();
+    } else if (match(TOKEN_VAR)) {
         varDeclaration();
     } else {
         statement();
