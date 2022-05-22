@@ -169,6 +169,32 @@ static void traceReferences() {
     }
 }
 
+// delete every unreachable object from `vm.objects` and free it
+// also resets `isMarked` for reachable objects to prepare for next run of GC
+static void sweep() {
+    Obj* previous = NULL;
+    Obj* object = vm.objects;
+    while (object != NULL) {
+        if (object->isMarked) {
+            // reset `isMarked` for reachable objects
+            object->isMarked = false;
+            previous = object;
+            object = object->next;
+        } else {
+            Obj* unreached = object;
+            // unlink the unreached object
+            object = object->next;
+            if (previous != NULL) {
+                previous->next = object;
+            } else {
+                vm.objects = object;
+            }
+
+            freeObject(unreached);
+        }
+    }
+}
+
 void collectGarbage() {
 #ifdef DEBUG_LOG_GC
     printf("-- gc begin\n");
@@ -176,6 +202,9 @@ void collectGarbage() {
 
     markRoots();
     traceReferences();
+    // note: hash table keys are weak references
+    tableRemoveWhite(&vm.strings);
+    sweep();
 
 #ifdef DEBUG_LOG_GC
     printf("-- gc end\n");

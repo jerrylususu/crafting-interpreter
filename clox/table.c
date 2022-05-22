@@ -163,6 +163,17 @@ ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t
     }
 }
 
+void tableRemoveWhite(Table* table) {
+    // i < table->capacity: for the entries between table->size and table->capacity,
+    // they are definitely unreachable, yet still need to be removed during GC
+    for (int i = 0; i < table->capacity; i++) {
+        Entry* entry = &table->entries[i];
+        if (entry->key != NULL && !entry->key->obj.isMarked) {
+            tableDelete(table, entry->key);
+        }
+    }
+}
+
 // mark the keys (ObjString) and values in the given hash table as reachable
 void markTable(Table* table) {
     for (int i = 0; i < table->capacity; i++) {
