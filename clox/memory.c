@@ -103,6 +103,13 @@ static void blackenObject(Obj* object) {
             markArray(&function->chunk.constants);
             break;
         }
+        case OBJ_INSTANCE: {
+            ObjInstance* instance = (ObjInstance*) object;
+            markObject((Obj*)instance->klass);
+            // note: need to keep every fields alive
+            markTable(&instance->fields);
+            break;
+        }
         case OBJ_UPVALUE:
             // note: when upvalue is still open, `closed` is NIL_VAL, so only closed upvalue will be marked
             markValue(((ObjUpvalue*)object)->closed);
@@ -137,6 +144,14 @@ static void freeObject(Obj* object) {
             freeChunk(&function->chunk);
             // note: function name (ObjString) will be handled by garbage collector (once we have one)
             FREE(ObjFunction, object);
+            break;
+        }
+        case OBJ_INSTANCE: {
+            ObjInstance* instance = (ObjInstance*)object;
+            // note: only freeing the entry (pointer) array, not the actual entries in the table
+            // because there may be other references to these objects, just leave them to GC
+            freeTable(&instance->fields);
+            FREE(ObjInstance, object);
             break;
         }
         case OBJ_NATIVE:
