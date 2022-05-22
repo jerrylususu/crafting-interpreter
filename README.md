@@ -14,6 +14,7 @@ This repo contains mainly personal notes, in the form of code comment.
 - (Chapter 5: Representing Code)
 - Chapter 6: Parsing Expressions
   - Recursive descent parsing
+  - Precedence Level
 - Chapter 7: Evaluating Expressions
 - Chapter 8: Statements and state
   - Environment Hashmap
@@ -52,3 +53,5 @@ This repo contains mainly personal notes, in the form of code comment.
   - Upvalue
 - Chapter 26: Garbage Collection
   - Mark-Sweep, Tricolor
+- Chapter 27: Classes and Instances
+  - Property vs. Field

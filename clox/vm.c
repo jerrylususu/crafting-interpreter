@@ -323,6 +323,43 @@ static InterpretResult run() {
                 // note: don't pop, assignment is an expression, and the assigned value needs to remain on stack
                 break;
             }
+            case OP_GET_PROPERTY: {
+                if (!IS_INSTANCE(peek(0))) {
+                    // property def: general term we use to refer to any named entity you can access on an instance
+                    runtimeError("Only instances have properties.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
+                ObjInstance* instance = AS_INSTANCE(peek(0));
+                ObjString* name = READ_STRING();
+
+                Value value;
+                if (tableGet(&instance->fields, name, &value)) {
+                    pop(); // Instance.
+                    push(value);
+                    break;
+                }
+
+                runtimeError("Undefined property '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            case OP_SET_PROPERTY: {
+                if (!IS_INSTANCE(peek(1))) {
+                    // fields def: subset of properties that are backed by the instance’s state.
+                    // in Lox, we can only set fields, not non-field properties
+                    runtimeError("Only instances have fields");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
+                // before execution, on stack: [instance] [value] (top)
+                ObjInstance* instance = AS_INSTANCE(peek(1));
+                tableSet(&instance->fields, READ_STRING(), peek(0));
+                Value value = pop();
+                pop(); // Instance.
+                push(value);
+                // after execution, on stack: [value] (top)
+                break;
+            }
             case OP_EQUAL: {
                 Value b = pop();
                 Value a = pop();
