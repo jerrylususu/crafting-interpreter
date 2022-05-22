@@ -22,6 +22,8 @@ static void freeObject(Obj* object) {
         case OBJ_CLOSURE: {
             // only free ObjClosure, not the ObjFunction, as the closure doesn't own the function
             // other closures and surrounding functions may still have reference to it
+            ObjClosure* closure = (ObjClosure*) object;
+            FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
             FREE(ObjClosure, object);
             break;
         }
@@ -42,6 +44,10 @@ static void freeObject(Obj* object) {
             FREE(ObjString, object);
             break;
         }
+        case OBJ_UPVALUE:
+            // Multiple closure can close over the same variable, so ObjUpvalue doesn't on the variable it references.
+            FREE(ObjUpvalue, object);
+            break;
     }
 }
 

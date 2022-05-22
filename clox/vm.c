@@ -134,6 +134,12 @@ static bool callValue(Value callee, int argCount) {
     return false;
 }
 
+// closing over a local variable
+static ObjUpvalue* captureUpvalue(Value* local) {
+    ObjUpvalue* createdUpvalue = newUpvalue(local);
+    return createdUpvalue;
+}
+
 // in Lox, only `nil` and `false` are falsey
 // every other value behaves like `true`
 static bool isFalsey(Value value) {
@@ -257,6 +263,17 @@ static InterpretResult run() {
                 }
                 break;
             }
+            case OP_GET_UPVALUE: {
+                uint8_t slot = READ_BYTE();
+                push(*frame->closure->upvalues[slot]->location);
+                break;
+            }
+            case OP_SET_UPVALUE: {
+                uint8_t slot = READ_BYTE();
+                *frame->closure->upvalues[slot]->location = peek(0);
+                // note: don't pop, assignment is an expression, and the assigned value needs to remain on stack
+                break;
+            }
             case OP_EQUAL: {
                 Value b = pop();
                 Value a = pop();
@@ -329,6 +346,17 @@ static InterpretResult run() {
                 ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
                 ObjClosure* closure = newClosure(function);
                 push(OBJ_VAL(closure));
+                for (int i = 0; i < closure->upvalueCount; i++) {
+                    uint8_t isLocal = READ_BYTE();
+                    uint8_t index = READ_BYTE();
+                    if (isLocal) {
+                        closure->upvalues[i] = captureUpvalue(frame->slots + index);
+                    } else {
+                        // when OP_CLOSURE executes, current function is the surrounding one of the closure
+                        // and current function's closure is stored in the topmost CallFrame
+                        closure->upvalues[i] = frame->closure->upvalues[i];
+                    }
+                }
                 break;
             }
             case OP_RETURN: {

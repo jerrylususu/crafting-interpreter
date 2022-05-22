@@ -23,6 +23,7 @@ typedef enum {
     OBJ_FUNCTION,
     OBJ_NATIVE,
     OBJ_STRING,
+    OBJ_UPVALUE
 } ObjType;
 
 // base class for heap-allocated objects
@@ -55,10 +56,18 @@ struct ObjString {
     uint32_t hash; // clox strings are immutable, so it's safe to cache hash eagerly
 };
 
+// runtime representation for upvalues
+typedef struct ObjUpvalue {
+    Obj obj;
+    Value* location; // pointer to the value (closed-over variables no longer live on stack, but on heap)
+} ObjUpvalue;
+
 // runtime representation of a function with captured variables
 typedef struct {
     Obj obj;
     ObjFunction* function;
+    ObjUpvalue** upvalues; // pointer to a dynamically allocated array of pointers to upvalues
+    int upvalueCount; // `function` may be freed earlier by GC, so we store the upvalueCount redundantly.
 } ObjClosure;
 
 ObjClosure* newClosure(ObjFunction* function);
@@ -66,6 +75,7 @@ ObjFunction* newFunction();
 ObjNative* newNative(NativeFn function);
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
+ObjUpvalue* newUpvalue(Value* slot);
 void printObject(Value value);
 
 // use a function to prevent evaluate parameter multiple times
