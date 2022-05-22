@@ -25,6 +25,10 @@ typedef struct {
     Table globals; // global variables
     Table strings; // a hash table (set) for all interned strings
     ObjUpvalue* openUpvalues; // a linked list of open upvalues (to ensure only 1 upvalue for each local)
+
+    size_t bytesAllocated;
+    size_t nextGC; // the threshold of bytes allocated that triggers next GC
+
     Obj* objects; // a linked list of heap-allocated objects
 
     int grayCount;
