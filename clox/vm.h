@@ -26,6 +26,10 @@ typedef struct {
     Table strings; // a hash table (set) for all interned strings
     ObjUpvalue* openUpvalues; // a linked list of open upvalues (to ensure only 1 upvalue for each local)
     Obj* objects; // a linked list of heap-allocated objects
+
+    int grayCount;
+    int grayCapacity;
+    Obj** grayStack; // worklist of gray objects (for GC)
 } VM;
 
 typedef enum {

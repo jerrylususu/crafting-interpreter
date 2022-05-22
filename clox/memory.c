@@ -30,6 +30,8 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 
 void markObject(Obj* object) {
     if (object == NULL) return;
+    // ensure GC won't stuck in reference cycles
+    if (object->isMarked) return;
 
 #ifdef DEBUG_LOG_GC
     printf("%p mark ", (void*)object);
@@ -38,11 +40,64 @@ void markObject(Obj* object) {
 #endif
 
     object->isMarked = true;
+
+    // put gray objects in the worklist
+    // note: use stack here since it's the simplest to implement with a dynamic array in C
+    if (vm.grayCapacity < vm.grayCount + 1) {
+        vm.grayCapacity = GROW_CAPACITY(vm.grayCapacity);
+        // use system `realloc`, not our own `reallocate`: prevent recursive GC invoke
+        vm.grayStack = (Obj**)realloc(vm.grayStack, sizeof(Obj*) * vm.grayCapacity);
+
+        if (vm.grayStack == NULL) exit(1);
+    }
+
+    vm.grayStack[vm.grayCount++] = object;
 }
 
 // only heap objects need to be marked
 void markValue(Value value) {
     if (IS_OBJ(value)) markObject(AS_OBJ(value));
+}
+
+static void markArray(ValueArray* array) {
+    for (int i = 0; i < array->count; i++) {
+        markValue(array->values[i]);
+    }
+}
+
+// turn white objects gray, gray objects black
+// definition of black: `isMarked == true` and no longer in the gray stack
+// trace outgoing references by type
+static void blackenObject(Obj* object) {
+#ifdef DEBUG_LOG_GC
+    printf("%p blacken ", (void*)object);
+    printValue(OBJ_VAL(object));
+    printf("\n");
+#endif
+
+    switch (object->type) {
+        case OBJ_CLOSURE: {
+            ObjClosure* closure = (ObjClosure*) object;
+            markObject((Obj*)closure->function);
+            for (int i = 0; i < closure->upvalueCount; i++) {
+                markObject((Obj*)closure->upvalues[i]);
+            }
+            break;
+        }
+        case OBJ_FUNCTION: {
+            ObjFunction* function = (ObjFunction*) object;
+            markObject((Obj*)function->name);
+            markArray(&function->chunk.constants);
+            break;
+        }
+        case OBJ_UPVALUE:
+            // note: when upvalue is still open, `closed` is NIL_VAL, so only closed upvalue will be marked
+            markValue(((ObjUpvalue*)object)->closed);
+            break;
+        case OBJ_NATIVE:
+        case OBJ_STRING:
+            break;
+    }
 }
 
 // type-specific code to handle each object type's special needs of freeing
@@ -107,12 +162,20 @@ static void markRoots() {
     markCompilerRoots();
 }
 
+static void traceReferences() {
+    while (vm.grayCount > 0) {
+        Obj* object = vm.grayStack[--vm.grayCount];
+        blackenObject(object);
+    }
+}
+
 void collectGarbage() {
 #ifdef DEBUG_LOG_GC
     printf("-- gc begin\n");
 #endif
 
     markRoots();
+    traceReferences();
 
 #ifdef DEBUG_LOG_GC
     printf("-- gc end\n");
@@ -127,4 +190,6 @@ void freeObjects() {
         freeObject(object);
         object = next;
     }
+
+    free(vm.grayStack);
 }
