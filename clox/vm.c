@@ -187,8 +187,9 @@ static bool isFalsey(Value value) {
 }
 
 static void concatenate() {
-    ObjString* b = AS_STRING(pop());
-    ObjString* a = AS_STRING(pop());
+    // peek and pop later: keep alive for GC
+    ObjString* b = AS_STRING(peek(0));
+    ObjString* a = AS_STRING(peek(1));
 
     int length = a->length + b->length;
     char* chars = ALLOCATE(char, length + 1);
@@ -198,6 +199,8 @@ static void concatenate() {
 
     // transfer ownership of the char array
     ObjString* result = takeString(chars, length);
+    pop();
+    pop();
     push(OBJ_VAL(result));
 }
 
