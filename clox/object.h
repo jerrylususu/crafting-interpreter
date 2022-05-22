@@ -34,6 +34,7 @@ struct Obj {
 typedef struct {
     Obj obj;
     int arity;
+    int upvalueCount;
     Chunk chunk; // each function's bytecode lives in its own chunk
     ObjString* name;
 } ObjFunction;
