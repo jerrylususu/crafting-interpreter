@@ -40,3 +40,5 @@ This repo contains mainly personal notes, in the form of code comment.
   - Control Flow
 - Chapter 24: Calls and Functions
   - Call Frame
+- Chapter 25: Closures
+  - Upvalue

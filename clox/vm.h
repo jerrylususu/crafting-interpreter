@@ -24,6 +24,7 @@ typedef struct {
     Value* stackTop; // where the next value to be pushed will go (not the top)
     Table globals; // global variables
     Table strings; // a hash table (set) for all interned strings
+    ObjUpvalue* openUpvalues; // a linked list of open upvalues (to ensure only 1 upvalue for each local)
     Obj* objects; // a linked list of heap-allocated objects
 } VM;
 

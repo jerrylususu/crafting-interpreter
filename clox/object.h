@@ -59,7 +59,9 @@ struct ObjString {
 // runtime representation for upvalues
 typedef struct ObjUpvalue {
     Obj obj;
-    Value* location; // pointer to the value (closed-over variables no longer live on stack, but on heap)
+    Value* location; // pointer to the value (open: on stack, closed: in heap)
+    Value closed; // where the closed-over values live in heap
+    struct ObjUpvalue* next; // intrusive list of ObjUpvalues, use to ensure only 1 Upvalue for each local
 } ObjUpvalue;
 
 // runtime representation of a function with captured variables

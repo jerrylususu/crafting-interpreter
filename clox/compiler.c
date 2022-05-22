@@ -45,6 +45,7 @@ typedef struct {
 typedef struct {
     Token name;
     int depth; // scope depth of the block where the local var was declared
+    bool isCaptured; // true if the local is captured by any later nested function declaration
 } Local;
 
 typedef struct {
@@ -224,6 +225,7 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
     // give it an empty name so user can not refer to it
     Local* local = &current->locals[current->localCount++];
     local->depth = 0;
+    local->isCaptured = false;
     local->name.start = "";
     local->name.length = 0;
 }
@@ -253,7 +255,13 @@ static void endScope() {
     // discard any variables declared at the scope we just left
     while (current->localCount > 0 &&
             current->locals[current->localCount - 1].depth > current->scopeDepth) {
-        emitByte(OP_POP);
+        if (current->locals[current->localCount - 1].isCaptured) {
+            // if the local is captured, we need to it move to heap
+            // no operand: the variable will always be at the top of the stack
+            emitByte(OP_CLOSE_UPVALUE);
+        } else {
+            emitByte(OP_POP);
+        }
         current->localCount--;
     }
 }
@@ -327,6 +335,8 @@ static int resolveUpvalue(Compiler* compiler, Token* name) {
     // loo for a matching local variable in the immediately enclosing function
     int local = resolveLocal(compiler->enclosing, name);
     if (local != -1) {
+        // mark the local as captured
+        compiler->enclosing->locals[local].isCaptured = true;
         return addUpvalue(compiler, (uint8_t)local, true);
     }
 
@@ -353,6 +363,9 @@ static void addLocal(Token name) {
 
     // mark the new variable as "uninitialized"
     local->depth = -1;
+
+    // initially all locals are not captured
+    local->isCaptured = false;
 }
 
 // let the compiler record the existence of a local variable
