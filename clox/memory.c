@@ -3,8 +3,20 @@
 #include "memory.h"
 #include "vm.h"
 
+#ifdef DEBUG_LOG_GC
+#include <stdio.h>
+#include "debug.h"
+#endif
+
 // handle all dynamic memory operation
 void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
+    // only trigger GC when expanding, since GC itself will call `reallocate` to free or shrink
+    if (newSize > oldSize) {
+#ifdef DEBUG_STRESS_GC
+        collectGarbage();
+#endif
+    }
+
     if (newSize == 0) {
         free(pointer);
         return NULL;
@@ -18,6 +30,10 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 
 // type-specific code to handle each object type's special needs of freeing
 static void freeObject(Obj* object) {
+#ifdef DEBUG_LOG_GC
+    printf("%p free type %d\n", (void*)object, object->type);
+#endif
+
     switch (object->type) {
         case OBJ_CLOSURE: {
             // only free ObjClosure, not the ObjFunction, as the closure doesn't own the function
@@ -50,6 +66,17 @@ static void freeObject(Obj* object) {
             break;
     }
 }
+
+void collectGarbage() {
+#ifdef DEBUG_LOG_GC
+    printf("-- gc begin\n");
+#endif
+
+#ifdef DEBUG_LOG_GC
+    printf("-- gc end\n");
+#endif
+}
+
 
 void freeObjects() {
     Obj* object = vm.objects;
