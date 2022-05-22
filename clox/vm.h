@@ -11,7 +11,7 @@
 
 // represents a single ongoing function call
 typedef struct {
-    ObjFunction* function;
+    ObjClosure* closure;
     uint8_t* ip; // caller stores its own ip before invoking callee, as the return address
     Value* slots; // pointing to the first slot the function can use in VM's value stack
 } CallFrame;
