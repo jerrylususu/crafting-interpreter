@@ -29,6 +29,7 @@ typedef enum {
 // base class for heap-allocated objects
 struct Obj {
     ObjType type;
+    bool isMarked; // marked as reachable (for GC)
     struct Obj* next;
 };
 

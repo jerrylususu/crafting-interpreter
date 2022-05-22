@@ -28,6 +28,23 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
     return result;
 }
 
+void markObject(Obj* object) {
+    if (object == NULL) return;
+
+#ifdef DEBUG_LOG_GC
+    printf("%p mark ", (void*)object);
+    printValue(OBJ_VAL(object));
+    printf("\n");
+#endif
+
+    object->isMarked = true;
+}
+
+// only heap objects need to be marked
+void markValue(Value value) {
+    if (IS_OBJ(value)) markObject(AS_OBJ(value));
+}
+
 // type-specific code to handle each object type's special needs of freeing
 static void freeObject(Obj* object) {
 #ifdef DEBUG_LOG_GC
@@ -67,10 +84,35 @@ static void freeObject(Obj* object) {
     }
 }
 
+static void markRoots() {
+    // (Lox) Value on stack
+    for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
+        markValue(*slot);
+    }
+
+    // ObjClosure
+    for (int i = 0; i < vm.frameCount; i++) {
+        markObject((Obj*)vm.frames[i].closure);
+    }
+
+    // ObjUpvalue
+    for (ObjUpvalue* upvalue = vm.openUpvalues; upvalue != NULL; upvalue = upvalue->next) {
+        markObject((Obj*)upvalue);
+    }
+
+    // globals
+    markTable(&vm.globals);
+
+    // GC can also begin during compilation. Any value the compiler directly accesses is also root.
+    markCompilerRoots();
+}
+
 void collectGarbage() {
 #ifdef DEBUG_LOG_GC
     printf("-- gc begin\n");
 #endif
+
+    markRoots();
 
 #ifdef DEBUG_LOG_GC
     printf("-- gc end\n");
