@@ -207,6 +207,9 @@ static void markRoots() {
 
     // GC can also begin during compilation. Any value the compiler directly accesses is also root.
     markCompilerRoots();
+
+    // initString should stick around and not cleaned during the whole compiling and runtime
+    markObject((Obj*)vm.initString);
 }
 
 static void traceReferences() {

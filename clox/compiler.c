@@ -56,6 +56,7 @@ typedef struct {
 
 typedef enum {
     TYPE_FUNCTION,
+    TYPE_INITIALIZER,
     TYPE_METHOD,
     TYPE_SCRIPT
 } FunctionType;
@@ -182,7 +183,12 @@ static int emitJump(uint8_t instruction) {
 }
 
 static void emitReturn() {
-    emitByte(OP_NIL);
+    // always return the initialized instance for class initializer
+    if (current->type == TYPE_INITIALIZER) {
+        emitBytes(OP_GET_LOCAL, 0);
+    } else {
+        emitByte(OP_NIL);
+    }
     emitByte(OP_RETURN);
 }
 
@@ -568,6 +574,10 @@ static void method() {
 
     // handle method param and body, leave the finished ObjClosure on stack
     FunctionType type = TYPE_METHOD;
+    // mark the method as initializer if its name is "init"
+    if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0) {
+        type = TYPE_INITIALIZER;
+    }
     function(type);
 
     emitBytes(OP_METHOD, constant);
@@ -738,6 +748,11 @@ static void returnStatement() {
     if (match(TOKEN_SEMICOLON)) {
         emitReturn(); // with implicit `nil` return value
     } else {
+        if (current->type == TYPE_INITIALIZER) {
+            error("Can't return a value from an initializer.");
+            // note: keep compiling after reporting the error to prevent compiler reporting cascaded errors
+        }
+
         // note: since VM's bytecode dispatch loop is completely flat,
         // returning within nested blocks is as straightforward as returning from the end of function body
         expression();
