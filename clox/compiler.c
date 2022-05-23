@@ -274,6 +274,8 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
+static void namedVariable(Token name, bool canAssign); // temporary fix, not on book
+
 // takes the given token and adds its lexeme to the chunk's constant table as a string
 // returns the index of that constant in the constant table
 static uint8_t identifierConstant(Token* name) {
@@ -548,8 +550,20 @@ static void function(FunctionType type) {
     }
 }
 
+static void method() {
+    consume(TOKEN_IDENTIFIER, "Expect method name");
+    uint8_t constant = identifierConstant(&parser.previous);
+
+    // handle method param and body, leave the finished ObjClosure on stack
+    FunctionType type = TYPE_FUNCTION;
+    function(type);
+
+    emitBytes(OP_METHOD, constant);
+}
+
 static void classDeclaration() {
     consume(TOKEN_IDENTIFIER, "Expect class name.");
+    Token className = parser.previous;
     uint8_t nameConstant = identifierConstant(&parser.previous);
     // class name used to bind the class object to a variable of the same name
     declareVariable();
@@ -557,9 +571,17 @@ static void classDeclaration() {
     emitBytes(OP_CLASS, nameConstant);
     // define class variable before body, allowing user to refer the containing class in its own methods
     defineVariable(nameConstant);
+    // bring the class variable back to the top of stack
+    namedVariable(className, false);
 
     consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    // note: Lox doesn't have field declarations, so anything before closing brace must be methods
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        // a single class declaration is implemented as a series of mutations
+        method();
+    }
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+    emitByte(OP_POP); // class variable
 }
 
 static void funDeclaration() {
