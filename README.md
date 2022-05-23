@@ -4,7 +4,9 @@ The book: [Crafting Interpreters](http://craftinginterpreters.com/)
 
 This repo contains mainly personal notes, in the form of code comment.
 
-## Current progress
+2022/5/23: 🎉 Completed!
+
+## Chapters & Interesting Ideas
 
 (Theory chapter, no code)
 
@@ -59,3 +61,6 @@ This repo contains mainly personal notes, in the form of code comment.
   - Superinstruction as an optimization
 - Chapter 29: Superclasses
   - Copy-down Inheritance
+- Chapter 30: Optimizations
+  - `mod` with bit masking (for faster hash table probing)
+  - NaN Boxing (aka. NaN Tagging)
