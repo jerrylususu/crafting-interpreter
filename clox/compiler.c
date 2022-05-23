@@ -76,6 +76,7 @@ typedef struct Compiler {
 
 typedef struct ClassCompiler {
     struct ClassCompiler* enclosing;
+    bool hasSuperclass;
 } ClassCompiler;
 
 Parser parser;
@@ -295,6 +296,7 @@ static void parsePrecedence(Precedence precedence);
 // temporary fix, not on book
 static void variable(bool canAssign);
 static void namedVariable(Token name, bool canAssign);
+static Token syntheticToken(const char* text);
 
 // takes the given token and adds its lexeme to the chunk's constant table as a string
 // returns the index of that constant in the constant table
@@ -604,6 +606,7 @@ static void classDeclaration() {
 
     // nesting a new class declaration
     ClassCompiler classCompiler;
+    classCompiler.hasSuperclass = false;
     classCompiler.enclosing = currentClass;
     currentClass = &classCompiler;
 
@@ -616,8 +619,15 @@ static void classDeclaration() {
             error("A class can't inherent from itself.");
         }
 
+        // store `super` as a local variable in a scope outside all method bodies
+        // so `super` will be automatically captured
+        beginScope();
+        addLocal(syntheticToken("super"));
+        defineVariable(0); // always the first element in the local table
+
         namedVariable(className, false); // put (sub)class name onto stack
         emitByte(OP_INHERIT);
+        classCompiler.hasSuperclass = true;
     }
 
     // bring the class variable back to the top of stack
@@ -631,6 +641,10 @@ static void classDeclaration() {
     }
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
     emitByte(OP_POP); // class variable
+
+    if (classCompiler.hasSuperclass) {
+        endScope();
+    }
 
     currentClass = currentClass->enclosing;
 }
@@ -930,6 +944,13 @@ static void namedVariable(Token name, bool canAssign) {
 
 static void variable(bool canAssign) {
     namedVariable(parser.previous, canAssign);
+}
+
+static Token syntheticToken(const char* text) {
+    Token token;
+    token.start = text;
+    token.length = (int)strlen(text);
+    return token;
 }
 
 static void this_(bool canAssign) {
