@@ -23,7 +23,9 @@ void freeTable(Table* table) {
 // find the entry the key belongs to
 // use linear probing for collision handling
 static Entry* findEntry(Entry* entries, int capacity, ObjString* key) {
-    uint32_t index = key->hash % capacity;
+    // use bit masking as mod, since we know capacity is always power of 2 (Section 30.2)
+    // equal to (key->hash % capacity)
+    uint32_t index = key->hash & (capacity - 1);
     Entry* tombstone = NULL;
 
     for (;;) {
@@ -45,7 +47,7 @@ static Entry* findEntry(Entry* entries, int capacity, ObjString* key) {
         }
 
         // *linear* probing
-        index = (index + 1) % capacity;
+        index = (index + 1) & (capacity - 1);
     }
 }
 
@@ -144,7 +146,7 @@ void tableAddAll(Table* from, Table* to) {
 ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t hash) {
     if (table->count == 0) return NULL;
 
-    uint32_t index = hash % table->capacity;
+    uint32_t index = hash & (table->capacity - 1);
     for (;;) {
         Entry* entry = &table->entries[index];
         if (entry->key == NULL) { // if the slot is empty or tombstone
@@ -159,7 +161,7 @@ ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t
             return entry->key;
         }
 
-        index = (index + 1) % table->capacity;
+        index = (index + 1) & (table->capacity - 1);
     }
 }
 
