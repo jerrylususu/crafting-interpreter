@@ -292,7 +292,9 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
-static void namedVariable(Token name, bool canAssign); // temporary fix, not on book
+// temporary fix, not on book
+static void variable(bool canAssign);
+static void namedVariable(Token name, bool canAssign);
 
 // takes the given token and adds its lexeme to the chunk's constant table as a string
 // returns the index of that constant in the constant table
@@ -604,6 +606,19 @@ static void classDeclaration() {
     ClassCompiler classCompiler;
     classCompiler.enclosing = currentClass;
     currentClass = &classCompiler;
+
+    // found a superclass clause
+    if (match(TOKEN_LESS)) {
+        consume(TOKEN_IDENTIFIER, "Expect superclass name.");
+        variable(false); // put superclass name onto stack
+
+        if (identifiersEqual(&className, &parser.previous)) {
+            error("A class can't inherent from itself.");
+        }
+
+        namedVariable(className, false); // put (sub)class name onto stack
+        emitByte(OP_INHERIT);
+    }
 
     // bring the class variable back to the top of stack
     namedVariable(className, false);
