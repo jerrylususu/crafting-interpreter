@@ -953,6 +953,32 @@ static Token syntheticToken(const char* text) {
     return token;
 }
 
+static void super_(bool canAssign) {
+    if (currentClass == NULL) {
+        error("Can't use 'super' outside of a class.");
+    } else if (!currentClass->hasSuperclass) {
+        error("Can't use 'super' in a class with no superclass.");
+    }
+
+    // `super` token is not a standalone expression, the dot and method name are inseparable
+    consume(TOKEN_DOT, "Expect '.' after 'super'.");
+    consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
+    uint8_t name = identifierConstant(&parser.previous);
+
+    // get back the method `super` refers to
+    namedVariable(syntheticToken("this"), false); // the instance
+    if (match(TOKEN_LEFT_PAREN)) {
+        // fast path: lookup a super method and immediately invoke it
+        uint8_t argCount = argumentList(); // put the arguments in the correct position on stack
+        namedVariable(syntheticToken("super"), false); // the superclass where the method is resolved
+        emitBytes(OP_SUPER_INVOKE, name); // the name of the method to access
+        emitByte(argCount);
+    } else {
+        namedVariable(syntheticToken("super"), false); // the superclass where the method is resolved
+        emitBytes(OP_GET_SUPER, name); // the name of the method to access
+    }
+}
+
 static void this_(bool canAssign) {
     // note: underscore after this: prevent collision with `this` in C++
 
@@ -1013,7 +1039,7 @@ ParseRule rules[] = {
     [TOKEN_OR]            = {NULL,     or_,    PREC_NONE},
     [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
     [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_SUPER]         = {super_,   NULL,   PREC_NONE},
     [TOKEN_THIS]          = {this_,    NULL,   PREC_NONE},
     [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
     [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},

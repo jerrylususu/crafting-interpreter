@@ -438,6 +438,17 @@ static InterpretResult run() {
                 // after execution, on stack: [value] (top)
                 break;
             }
+            case OP_GET_SUPER: {
+                ObjString* name = READ_STRING();
+                ObjClass* superclass = AS_CLASS(pop());
+
+                // bind the method to superclass, not the receiver's own class
+                // note: only 1 pop here: another pop in `bindMethod` to pop the ObjInstance
+                if (!bindMethod(superclass, name)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
             case OP_EQUAL: {
                 Value b = pop();
                 Value a = pop();
@@ -512,6 +523,18 @@ static InterpretResult run() {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 // update the (local) cached pointer of current frame in `run()`
+                frame = &vm.frames[vm.frameCount - 1];
+                break;
+            }
+            case OP_SUPER_INVOKE: {
+                // combine OP_GET_SUPER and OP_CALL
+                ObjString* method = READ_STRING();
+                int argCount = READ_BYTE();
+                ObjClass* superclass = AS_CLASS(pop());
+                // note: after the pop, the stack is just right for a method call
+                if (!invokeFromClass(superclass, method, argCount)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
                 frame = &vm.frames[vm.frameCount - 1];
                 break;
             }

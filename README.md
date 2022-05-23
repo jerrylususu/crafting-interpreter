@@ -57,3 +57,5 @@ This repo contains mainly personal notes, in the form of code comment.
   - Property vs. Field
 - Chapter 28: Methods and Initializers
   - Superinstruction as an optimization
+- Chapter 29: Superclasses
+  - Copy-down Inheritance
