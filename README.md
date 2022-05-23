@@ -55,3 +55,5 @@ This repo contains mainly personal notes, in the form of code comment.
   - Mark-Sweep, Tricolor
 - Chapter 27: Classes and Instances
   - Property vs. Field
+- Chapter 28: Methods and Initializers
+  - Superinstruction as an optimization

@@ -166,6 +166,40 @@ static bool callValue(Value callee, int argCount) {
     return false;
 }
 
+static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        runtimeError("Undefined property '%s'.", name->chars);
+        return false;
+    }
+    // note: at execution, the receiver and method arguments are already where right where they need to be
+    return call(AS_CLOSURE(method), argCount);
+}
+
+// invoke: access a method and immediately calls it
+static bool invoke(ObjString* name, int argCount) {
+    Value receiver = peek(argCount);
+
+    if (!IS_INSTANCE(receiver)) {
+        runtimeError("Only instance has methods.");
+        return false;
+    }
+
+    ObjInstance* instance = AS_INSTANCE(receiver);
+
+    // OP_GET_PROPERTY handles both field and method access, and OP_INVOKE should too
+    // if there is a field (hopefully stores a function) with the same name, call it
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+        // if found, place it on the stack in place of the receiver, under the argument list
+        vm.stackTop[-argCount - 1] = value;
+        // callValue will check the value's type
+        return callValue(value, argCount);
+    }
+
+    return invokeFromClass(instance->klass, name, argCount);
+}
+
 static bool bindMethod(ObjClass* klass, ObjString* name) {
     Value method;
     if (!tableGet(&klass->methods, name, &method)) {
@@ -468,6 +502,16 @@ static InterpretResult run() {
                 }
                 // update the (local) cached pointer of current frame in `run()`
                 // VM will read the `ip` from the new CallFrame in the next cycle
+                frame = &vm.frames[vm.frameCount - 1];
+                break;
+            }
+            case OP_INVOKE: {
+                ObjString* method = READ_STRING();
+                int argCount = READ_BYTE();
+                if (!invoke(method, argCount)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                // update the (local) cached pointer of current frame in `run()`
                 frame = &vm.frames[vm.frameCount - 1];
                 break;
             }

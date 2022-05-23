@@ -506,6 +506,12 @@ static void dot(bool canAssign) {
     if (canAssign && match(TOKEN_EQUAL)) {
         expression();
         emitBytes(OP_SET_PROPERTY, name);
+    } else if (match(TOKEN_LEFT_PAREN)) {
+        // common operation: access the method and immediate call it
+        // thus can be optimized using a single superinstruction and skip the allocation of ObjBoundMethod
+        uint8_t argCount = argumentList();
+        emitBytes(OP_INVOKE, name); // index of the property name in the constant table
+        emitByte(argCount);
     } else {
         emitBytes(OP_GET_PROPERTY, name);
     }
