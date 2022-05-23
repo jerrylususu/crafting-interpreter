@@ -1,8 +1,11 @@
-class Scone {
-  topping(first, second) {
-    print "scone with " + first + " and " + second;
+class Person {
+  sayName() {
+    print this.name;
   }
 }
 
-var scone = Scone();
-scone.topping("berries", "cream");
+var jane = Person();
+jane.name = "Jane";
+
+var method = jane.sayName;
+method(); // should be "Jane"

@@ -56,6 +56,7 @@ typedef struct {
 
 typedef enum {
     TYPE_FUNCTION,
+    TYPE_METHOD,
     TYPE_SCRIPT
 } FunctionType;
 
@@ -72,8 +73,13 @@ typedef struct Compiler {
     int scopeDepth; // number of blocks surrounding current bit of code
 } Compiler;
 
+typedef struct ClassCompiler {
+    struct ClassCompiler* enclosing;
+} ClassCompiler;
+
 Parser parser;
 Compiler* current = NULL;
+ClassCompiler* currentClass = NULL; // current, innermost class being compiled
 
 static Chunk* currentChunk() {
     return &current->function->chunk;
@@ -223,12 +229,18 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
     }
 
     // compiler implicitly claims stack slot 0 for VM's internal use (storing the function being called)
-    // give it an empty name so user can not refer to it
     Local* local = &current->locals[current->localCount++];
     local->depth = 0;
     local->isCaptured = false;
-    local->name.start = "";
-    local->name.length = 0;
+    if (type != TYPE_FUNCTION) {
+        // for methods, ObjBoundMethod is stored in slot 0 with variable name `this`
+        local->name.start = "this";
+        local->name.length = 4;
+    } else {
+        // for functions, give it an empty name so user can not refer to it
+        local->name.start = "";
+        local->name.length = 0;
+    }
 }
 
 static ObjFunction* endCompiler() {
@@ -555,7 +567,7 @@ static void method() {
     uint8_t constant = identifierConstant(&parser.previous);
 
     // handle method param and body, leave the finished ObjClosure on stack
-    FunctionType type = TYPE_FUNCTION;
+    FunctionType type = TYPE_METHOD;
     function(type);
 
     emitBytes(OP_METHOD, constant);
@@ -571,6 +583,12 @@ static void classDeclaration() {
     emitBytes(OP_CLASS, nameConstant);
     // define class variable before body, allowing user to refer the containing class in its own methods
     defineVariable(nameConstant);
+
+    // nesting a new class declaration
+    ClassCompiler classCompiler;
+    classCompiler.enclosing = currentClass;
+    currentClass = &classCompiler;
+
     // bring the class variable back to the top of stack
     namedVariable(className, false);
 
@@ -582,6 +600,8 @@ static void classDeclaration() {
     }
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
     emitByte(OP_POP); // class variable
+
+    currentClass = currentClass->enclosing;
 }
 
 static void funDeclaration() {
@@ -876,6 +896,18 @@ static void variable(bool canAssign) {
     namedVariable(parser.previous, canAssign);
 }
 
+static void this_(bool canAssign) {
+    // note: underscore after this: prevent collision with `this` in C++
+
+    if (currentClass == NULL) {
+        error("Can't use 'this' outside of a class.");
+        return;
+    }
+
+    // compile `this` like a local variable
+    variable(false);
+}
+
 static void unary(bool canAssign) {
     TokenType operatorType = parser.previous.type;
 
@@ -925,7 +957,7 @@ ParseRule rules[] = {
     [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
     [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_THIS]          = {this_,    NULL,   PREC_NONE},
     [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
     [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
